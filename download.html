@@ -1,0 +1,41 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Downloading lecture</title>
+  <link rel="stylesheet" href="ui.css">
+</head>
+<body class="page">
+  <h1 id="title">Loading…</h1>
+  <div class="muted" id="meta"></div>
+
+  <div class="card" id="nameCard">
+    <div><strong>Names</strong></div>
+    <label class="field">
+      <span>Lecture name</span>
+      <input type="text" id="lectureName" dir="auto" spellcheck="false">
+    </label>
+    <label class="field">
+      <span>Course folder <span class="muted small">(leave empty to save straight into the folder you pick)</span></span>
+      <input type="text" id="courseName" dir="auto" spellcheck="false">
+    </label>
+  </div>
+
+  <div class="card" id="folderCard">
+    <div><strong>Save to folder</strong></div>
+    <div class="muted" id="folderName">No folder chosen yet.</div>
+    <div class="row" style="margin-top:10px">
+      <button id="useSaved" hidden>Use this folder</button>
+      <button id="choose">Choose folder…</button>
+    </div>
+    <div class="muted small">The lecture will be saved in <code id="subPath" dir="ltr" style="unicode-bidi: isolate"></code> inside it.</div>
+  </div>
+
+  <div id="progress"></div>
+  <div id="result"></div>
+
+  <script src="lib/mux.min.js"></script>
+  <script src="common.js"></script>
+  <script src="download.js"></script>
+</body>
+</html>
