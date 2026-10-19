@@ -1,0 +1,47 @@
+PANOPTO LECTURE DOWNLOADER: HOW TO INSTALL (one time, about 1 minute)
+
+Downloads HUJI Panopto lectures (camera + screen) so you can watch them offline,
+with a player that swaps the two views and changes the speed.
+
+1. Move this folder ("Panopto Lecture Downloader") somewhere permanent,
+   for example your home folder or Documents.
+   - NOT inside OneDrive, iCloud Drive or Dropbox: cloud folders can make the
+     files "online-only" and then Chrome fails to load the extension.
+   - Don't delete or move it later: Chrome runs the extension from this folder.
+
+2. In Chrome, type   chrome://extensions   in the address bar and press Enter.
+
+3. Turn on "Developer mode" (switch in the top-right corner).
+
+4. Click "Load unpacked" (top left) and select this folder
+   (the one that contains manifest.json). Click "Select".
+
+5. Click the puzzle-piece icon in Chrome's toolbar and pin
+   "Panopto Lecture Downloader".
+
+Chrome may show a "developer mode extensions" notice now and then. That's normal
+for extensions not installed from the Web Store; just dismiss it.
+
+
+HOW TO USE
+
+1. Log in to Panopto and open a lecture (the page where the video plays).
+2. Click the extension icon, then "Download…".
+3. Choose a folder and wait until both progress bars finish (keep the tab open).
+4. Open the lecture folder and double-click player.html to watch.
+
+Player keys: Space play/pause · S swap big/small · V change view ·
+C camera only · X screen only · [ ] speed · ← → skip 10 s · F fullscreen.
+You can drag the small video anywhere.
+
+Saving lectures into OneDrive? Right-click the lectures folder in Finder and choose
+"Always Keep on This Device", or the videos may not play offline.
+
+
+UPDATING TO A NEWER VERSION
+
+Replace the files in this folder with the new ones, then go to chrome://extensions
+and click the reload arrow on the extension's card.
+
+Use this only for lectures you have access to, for personal study, and in line
+with university policy.
