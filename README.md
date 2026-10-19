@@ -49,9 +49,11 @@ Double-click `player.html`. It opens in Chrome and needs no internet.
 |---|---|---|
 | Play / pause | ▶︎ button, or click the big video | `Space` |
 | Swap big ↔ small screen | ⇄ Swap, or click the small video | `S` |
-| Layout (big+small / side by side / one screen) | Layout menu | `V` |
+| Move the small video | drag it anywhere (remembered per lecture) | |
+| View: big+small / side by side / camera only / screen only | View menu | `V` cycles |
+| Camera only / screen only | View menu | `C` / `X` |
 | Speed 0.5×–3× | speed buttons | `[` slower, `]` faster |
-| Skip 10 s (30 s with Shift) | ⟲ / ⟳ | `←` / `→` |
+| Skip back / forward 10 s (30 s with Shift) | ◀◀ 10s / 10s ▶▶ buttons | `←` / `→` |
 | Mute | | `M` |
 | Fullscreen | ⛶ | `F` |
 

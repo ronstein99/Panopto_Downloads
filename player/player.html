@@ -22,8 +22,11 @@
   /* Layout: big + small picture-in-picture */
   #stage.pip .main { inset: 0; width: 100%; height: 100%; z-index: 1; }
   #stage.pip .side { right: 16px; bottom: 16px; width: 24%; aspect-ratio: 16/9; height: auto; z-index: 2;
-    border: 2px solid rgba(255,255,255,.35); border-radius: 8px; cursor: pointer; }
+    border: 2px solid rgba(255,255,255,.35); border-radius: 8px; cursor: grab; touch-action: none; }
   #stage.pip .side:hover { border-color: var(--accent); }
+  #stage.pip .side.dragging { transition: none; cursor: grabbing; border-color: var(--accent);
+    box-shadow: 0 8px 24px rgba(0,0,0,.5); }
+  .chip.dragging { transition: none; }
   /* Layout: side by side */
   #stage.split .main { left: 0; top: 0; width: 62%; height: 100%; }
   #stage.split .side { right: 0; top: 0; width: 38%; height: 100%; cursor: pointer; }
@@ -67,24 +70,23 @@
   <input type="range" id="seek" min="0" max="1000" value="0" step="1">
   <div class="bar">
     <button id="play" title="Play / pause (space)">▶︎ Play</button>
-    <button id="back" title="Back 10 s (←)">⟲ 10</button>
-    <button id="fwd" title="Forward 10 s (→)">10 ⟳</button>
+    <button id="back" title="Back 10 seconds (←, Shift+← for 30 s)">◀◀ 10s</button>
+    <button id="fwd" title="Forward 10 seconds (→, Shift+→ for 30 s)">10s ▶▶</button>
     <span id="time">0:00 / 0:00</span>
     <span class="spacer"></span>
     <span class="speeds" id="speeds"></span>
     <button id="swap" title="Swap big / small (S)">⇄ Swap</button>
-    <select id="layout" title="Layout (V)">
+    <select id="layout" title="View (V)">
       <option value="pip">Big + small</option>
       <option value="split">Side by side</option>
-      <option value="single">One screen</option>
     </select>
     <select id="audio" title="Which recording's sound to use"></select>
     <button id="fs" title="Fullscreen (F)">⛶</button>
   </div>
   <div id="help">
     <kbd>Space</kbd> play/pause · <kbd>←</kbd><kbd>→</kbd> 10 s · <kbd>[</kbd><kbd>]</kbd> speed ·
-    <kbd>S</kbd> swap screens · <kbd>V</kbd> layout · <kbd>M</kbd> mute · <kbd>F</kbd> fullscreen ·
-    click the small video to make it big
+    <kbd>S</kbd> swap screens · <kbd>V</kbd> next view · <kbd>C</kbd> camera only · <kbd>X</kbd> screen only ·
+    <kbd>M</kbd> mute · <kbd>F</kbd> fullscreen · drag the small video to move it, click it to make it big
   </div>
 </div>
 
@@ -137,6 +139,8 @@ const LECTURE = /*LECTURE_DATA*/null;
   if (mainIdx >= players.length) mainIdx = 0;
   if (audioIdx >= players.length) audioIdx = 0;
   let layout = players.length > 1 ? (saved.layout || "pip") : "single";
+  // Where the small video sits, as fractions of the free space (0..1); null = default corner.
+  let pipPos = saved.pip || null;
   let rate = store.get("panopto:speed", 1);
   let muted = false;
 
@@ -213,10 +217,31 @@ const LECTURE = /*LECTURE_DATA*/null;
       p.el.className = i === mainIdx ? "main" : "side";
       p.chip.style.display = layout === "single" && i !== mainIdx ? "none" : "";
     });
+    placeSide();
     positionChips();
-    $("layout").value = layout;
+    $("layout").value = layout === "single" ? "only-" + mainIdx : layout;
     $("swap").disabled = $("layout").disabled = players.length < 2;
     persist();
+  }
+
+  // Put the small video where it was dragged to. Only used in the big + small view.
+  function placeSide() {
+    for (const p of players) p.el.style.left = p.el.style.top = p.el.style.right = p.el.style.bottom = "";
+    if (layout !== "pip" || players.length < 2 || !pipPos) return;
+    const side = players[1 - mainIdx].el;
+    const { freeX, freeY } = pipFreeSpace();
+    side.style.left = freeX * pipPos.x + "px";
+    side.style.top = freeY * pipPos.y + "px";
+    side.style.right = side.style.bottom = "auto";
+  }
+  window.addEventListener("resize", placeSide);
+
+  // Room the small video can move in. Its size comes from the CSS (24% wide, 16:9, border-box),
+  // computed here rather than measured so it is right even mid-animation.
+  function pipFreeSpace() {
+    const box = stage.getBoundingClientRect();
+    const w = box.width * 0.24, h = w * 9 / 16;
+    return { box, freeX: Math.max(1, box.width - w), freeY: Math.max(1, box.height - h) };
   }
 
   function positionChips() {
@@ -237,7 +262,34 @@ const LECTURE = /*LECTURE_DATA*/null;
     applyLayout();
   }
 
-  function setLayout(l) { layout = l; applyLayout(); }
+  // l is "pip", "split", or "only-<index>" (show just that recording).
+  function setLayout(l) {
+    if (players.length < 2) return;
+    if (l.startsWith("only-")) {
+      layout = "single";
+      mainIdx = Number(l.slice(5));
+      toast(viewName(l));
+    } else {
+      layout = l;
+    }
+    applyLayout();
+  }
+
+  function viewName(value) {
+    const o = [...$("layout").options].find((o) => o.value === value);
+    return o ? o.textContent : value;
+  }
+
+  function cycleView() {
+    const values = [...$("layout").options].map((o) => o.value);
+    const cur = layout === "single" ? "only-" + mainIdx : layout;
+    setLayout(values[(values.indexOf(cur) + 1) % values.length]);
+  }
+
+  function showOnly(label) {
+    const i = players.findIndex((p) => p.info.label === label);
+    if (i >= 0) setLayout("only-" + i);
+  }
 
   function applyAudio() {
     players.forEach((p, i) => { p.el.muted = muted || i !== audioIdx; });
@@ -268,7 +320,7 @@ const LECTURE = /*LECTURE_DATA*/null;
   }
 
   function persist() {
-    store.set(key, { ...store.get(key, {}), main: mainIdx, audio: audioIdx, layout });
+    store.set(key, { ...store.get(key, {}), main: mainIdx, audio: audioIdx, layout, pip: pipPos });
   }
 
   SPEEDS.forEach((s) => {
@@ -283,6 +335,10 @@ const LECTURE = /*LECTURE_DATA*/null;
     o.value = String(i);
     o.textContent = "Sound: " + (NAMES[p.info.label] || p.info.label);
     $("audio").appendChild(o);
+    const v = document.createElement("option");
+    v.value = "only-" + i;
+    v.textContent = (NAMES[p.info.label] || p.info.label) + " only";
+    $("layout").appendChild(v);
   });
   $("audio").hidden = players.length < 2;
 
@@ -298,8 +354,43 @@ const LECTURE = /*LECTURE_DATA*/null;
     setTimeout(positionChips, 250);
   });
 
+  // Small video: drag to move it, click to make it big.
+  let drag = null;
+  let justDragged = false;
   players.forEach((p, i) => {
+    p.el.addEventListener("pointerdown", (e) => {
+      if (layout !== "pip" || i === mainIdx || e.button !== 0) return;
+      const r = p.el.getBoundingClientRect();
+      drag = { i, dx: e.clientX - r.left, dy: e.clientY - r.top, x0: e.clientX, y0: e.clientY, moved: false };
+      p.el.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    p.el.addEventListener("pointermove", (e) => {
+      if (!drag || drag.i !== i) return;
+      if (!drag.moved && Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < 5) return;
+      drag.moved = true;
+      p.el.classList.add("dragging");
+      p.chip.classList.add("dragging");
+      const { box, freeX, freeY } = pipFreeSpace();
+      pipPos = {
+        x: Math.min(1, Math.max(0, (e.clientX - box.left - drag.dx) / freeX)),
+        y: Math.min(1, Math.max(0, (e.clientY - box.top - drag.dy) / freeY)),
+      };
+      placeSide();
+      positionChips();
+    });
+    const endDrag = () => {
+      if (!drag || drag.i !== i) return;
+      if (drag.moved) { justDragged = true; persist(); }
+      drag = null;
+      p.el.classList.remove("dragging");
+      p.chip.classList.remove("dragging");
+    };
+    p.el.addEventListener("pointerup", endDrag);
+    p.el.addEventListener("pointercancel", endDrag);
+
     p.el.addEventListener("click", () => {
+      if (justDragged) { justDragged = false; return; }
       if (i !== mainIdx && layout !== "single") swap();
       else toggle();
     });
@@ -356,7 +447,9 @@ const LECTURE = /*LECTURE_DATA*/null;
     else if (k === "[") stepRate(-1);
     else if (k === "]") stepRate(1);
     else if (k === "s" || k === "S") swap();
-    else if (k === "v" || k === "V") setLayout({ pip: "split", split: "single", single: "pip" }[layout]);
+    else if (k === "v" || k === "V") cycleView();
+    else if (k === "c" || k === "C") showOnly("camera");
+    else if (k === "x" || k === "X") showOnly("screen");
     else if (k === "m" || k === "M") { muted = !muted; applyAudio(); toast(muted ? "Muted" : "Sound on"); }
     else if (k === "f" || k === "F") $("fs").click();
   });
