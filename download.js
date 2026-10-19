@@ -296,8 +296,27 @@ async function writeText(dir, name, text) {
   await w.close();
 }
 
+// Loaded once when the page opens, so a later hiccup reading the extension folder
+// (e.g. OneDrive making the file "online-only") can't stop player.html being written.
+let playerTemplate = null;
+async function loadPlayerTemplate() {
+  if (playerTemplate) return playerTemplate;
+  let lastErr;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      const text = await (await fetch(chrome.runtime.getURL("player/player.html"))).text();
+      if (!text.includes("/*LECTURE_DATA*/null")) throw new Error("player template is incomplete");
+      return (playerTemplate = text);
+    } catch (e) {
+      lastErr = e;
+      await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
+    }
+  }
+  throw new Error("Could not read the player template: " + lastErr.message);
+}
+
 async function writePlayer(dir, items) {
-  const tpl = await (await fetch(chrome.runtime.getURL("player/player.html"))).text();
+  const tpl = await loadPlayerTemplate();
   const data = {
     id: job.id,
     title: $("lectureName").value.trim() || job.title,
@@ -308,15 +327,38 @@ async function writePlayer(dir, items) {
     })),
   };
   const json = JSON.stringify(data).replace(/</g, "\\u003c");
-  await writeText(dir, "player.html", tpl.replace("/*LECTURE_DATA*/null", json));
+  // A function replacement, so "$" in a title isn't treated as a replace pattern.
+  await writeText(dir, "player.html", tpl.replace("/*LECTURE_DATA*/null", () => json));
+}
+
+function showResult(ok, heading, detail) {
+  $("result").innerHTML = `<div class="card"><strong class="${ok ? "ok" : "error"}"></strong>
+    <div class="muted small" style="margin-top:6px"></div></div>`;
+  $("result").querySelector("strong").textContent = heading;
+  $("result").querySelector("div").textContent = detail;
 }
 
 async function run(root) {
   busy = true;
   $("choose").disabled = $("useSaved").disabled = true;
   $("lectureName").disabled = $("courseName").disabled = true;
+  $("result").innerHTML = "";
   window.onbeforeunload = () => "Download in progress";
+  try {
+    await download(root);
+  } catch (e) {
+    console.error(e);
+    showResult(false, "Something went wrong: " + e.message,
+      "Files that finished are kept. Click Use this folder to try again; it skips them.");
+  } finally {
+    window.onbeforeunload = null;
+    busy = false;
+    $("choose").disabled = $("useSaved").disabled = false;
+    $("lectureName").disabled = $("courseName").disabled = false;
+  }
+}
 
+async function download(root) {
   const course = courseFolderName();
   const parent = course ? await root.getDirectoryHandle(course, { create: true }) : root;
   const dir = await parent.getDirectoryHandle(lectureFolderName(), { create: true });
@@ -324,6 +366,10 @@ async function run(root) {
   const doneBefore = new Set((previous.files || []).filter((f) => f.complete).map((f) => f.file));
 
   const items = assignFileNames(job.selected);
+  // Write the player up front (listing every video) so it exists even if the tab is closed
+  // mid-download; it's rewritten at the end to list only the videos that finished.
+  let playerError = null;
+  await writePlayer(dir, items.map((s) => ({ ...s, done: true }))).catch((e) => { playerError = e; });
   $("progress").innerHTML = "";
   const runs = items.map(async (s) => {
     const card = document.createElement("div");
@@ -370,19 +416,20 @@ async function run(root) {
     source: `${job.origin}/Panopto/Pages/Viewer.aspx?id=${job.id}`,
     files: items.map((s) => ({ file: s.file, label: s.label, kind: s.kind, tag: s.tag, offset: s.offset, complete: !!s.done })),
   }, null, 2));
-  if (items.some((s) => s.done)) await writePlayer(dir, items);
+  if (items.some((s) => s.done)) {
+    playerError = null;
+    await writePlayer(dir, items).catch((e) => { playerError = e; });
+  }
 
-  window.onbeforeunload = null;
-  busy = false;
   const path = `${root.name}/${relativePath()}`.replace(/\/$/, "");
+  if (playerError) {
+    showResult(false, "Videos saved, but player.html could not be written: " + playerError.message,
+      `Click Use this folder to try again (finished videos are skipped). Meanwhile, open the .mp4 files in ${path} directly.`);
+    return;
+  }
   const allOk = items.every((s) => s.done);
-  $("result").innerHTML = `<div class="card"><strong class="${allOk ? "ok" : "error"}"></strong>
-    <div class="muted small" style="margin-top:6px"></div></div>`;
-  $("result").querySelector("strong").textContent = allOk ? "Lecture saved." : "Some files failed — click Use this folder to retry them.";
-  $("result").querySelector("div").textContent =
-    `Open ${path}/player.html to watch (double-click it in Finder; it opens in Chrome).`;
-  $("choose").disabled = $("useSaved").disabled = false;
-  $("lectureName").disabled = $("courseName").disabled = false;
+  showResult(allOk, allOk ? "Lecture saved." : "Some files failed — click Use this folder to retry them.",
+    `Open ${path}/player.html to watch (double-click it in Finder; it opens in Chrome).`);
 }
 
 async function ensureHostPermission() {
@@ -416,6 +463,7 @@ async function init() {
   $("courseName").addEventListener("change", () =>
     chrome.storage.local.set({ useCourseFolder: !!$("courseName").value.trim() }));
   updatePath();
+  loadPlayerTemplate().catch((e) => console.warn(e)); // retried when it's needed
 
   const saved = await kvGet("rootDir");
   if (saved) {
