@@ -6,13 +6,17 @@ player that lets you swap between them and change the speed, just like in Panopt
 
 ## Install (one time)
 
-1. Open Chrome and go to `chrome://extensions`.
-2. Turn on **Developer mode** (top right).
-3. Click **Load unpacked** and select this `panopto-downloader` folder.
-4. Click the puzzle-piece icon in the toolbar and **pin** "Panopto Lecture Downloader".
+1. On the GitHub page, click **Code → Download ZIP** and unzip it. Put the folder somewhere
+   **outside OneDrive / iCloud Drive**, for example your home folder. Cloud folders can make
+   files "online-only", and Chrome then fails to load the extension.
+2. Open Chrome and go to `chrome://extensions`.
+3. Turn on **Developer mode** (top right).
+4. Click **Load unpacked** and select the unzipped folder (the one containing `manifest.json`).
+5. Click the puzzle-piece icon in the toolbar and **pin** "Panopto Lecture Downloader".
 
 > Chrome loads the extension from this folder, so don't move or delete it.
-> If you edit the files, press the ↻ reload button on the extension's card.
+> To update, replace the folder's files with a newer download, then press the ↻ reload button
+> on the extension's card.
 
 ## Download a lecture
 
@@ -40,6 +44,10 @@ Each lecture gets its own folder:
 
 Clicking **Use this folder** again on the same lecture skips files that already finished
 and retries only the ones that failed.
+
+> **Saving into OneDrive?** Right-click your lectures folder in Finder and choose
+> **Always Keep on This Device**. Otherwise OneDrive may move the videos to the cloud and
+> they won't play offline.
 
 ## Watch offline
 
